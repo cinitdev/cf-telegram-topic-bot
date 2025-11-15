@@ -1,0 +1,33 @@
+name = "telegram-bot"
+main = "index.js"
+compatibility_date = "2024-11-14"
+
+[vars]
+# 填入你的 Bot Token (来自 @BotFather)
+BOT_TOKEN = "123456:ABC-DEF123456789"
+# 填入你的管理群组 ID (必须是启用了 Topic 的超级群组，以 -100 开头)
+ADMIN_GROUP_ID = "-1001234567890"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "USER_STATE"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[[kv_namespaces]]
+binding = "BLACKLIST"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[[kv_namespaces]]
+binding = "TOPIC_MAP"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[[kv_namespaces]]
+binding = "MESSAGE_MAP"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[observability]
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
