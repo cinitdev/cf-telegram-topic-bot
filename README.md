@@ -67,8 +67,8 @@ wrangler login
 ### 步骤 4: 配置 wrangler.toml
 
 1. 打开项目中的 `wrangler.toml` 文件，如果没有就自己创建。
-2. **修改 `name`**：改成您想要的 Worker 名称 (例如 `my-telegram-bot`)。
-3. **填写 `id`**：将您上一步复制的 KV ID 粘贴到 `[[kv_namespaces]]` 下的 `id` 字段中。
+2. **修改 `name`**：改成您想要的 Worker 名称 (例如 ```my-telegram-bot```)。
+3. **填写 `id`**：将您上一步复制的 KV ID 粘贴到 ```[[kv_namespaces]]`` 下的 ```id``` 字段中。
 ```toml
 name = "my-telegram-bot" # <--改成您的
 main = "index.js"
@@ -102,7 +102,7 @@ wrangler deploy
 
 ### 步骤 6: 设置 Webhook (最后一步)
 在您的浏览器中访问以下 URL（将域名替换为您刚部署的域名）：
-`https://my-telegram-bot.your-name.workers.dev/setup`
+```https://my-telegram-bot.your-name.workers.dev/setup```
 
 看到 `{"ok":true,...}` 即表示成功！您的机器人已开始运行。
 
@@ -157,8 +157,8 @@ wrangler deploy
  * 在 Worker 的 "Overview" (概览) 页面，找到您的 *.workers.dev 域名。
  * 在您的手机浏览器中，打开一个新的标签页。
  * 访问这个 URL (将域名替换成您的)：
-   https://my-telegram-bot.your-name.workers.dev/setup
- * 看到 {"ok":true,...} 即表示成功！您的机器人已开始运行。
+   ```https://my-telegram-bot.your-name.workers.dev/setup```
+ * 看到 ```{"ok":true,...}``` 即表示成功！您的机器人已开始运行。
 
 ### 🐛 故障排除 (FAQ)
  * Q: 机器人没反应？
