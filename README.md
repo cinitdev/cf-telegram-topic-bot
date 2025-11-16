@@ -68,7 +68,7 @@ wrangler login
 
 1. 打开项目中的 `wrangler.toml` 文件，如果没有就自己创建。
 2. **修改 `name`**：改成您想要的 Worker 名称 (例如 ```my-telegram-bot```)。
-3. **填写 `id`**：将您上一步复制的 KV ID 粘贴到 ```[[kv_namespaces]]`` 下的 ```id``` 字段中。
+3. **填写 `id`**：将您上一步复制的 KV ID 粘贴到 `[[kv_namespaces]]` 下的 `id` 字段中。
 ```toml
 name = "my-telegram-bot" # <--改成您的
 main = "index.js"
@@ -102,12 +102,13 @@ wrangler deploy
 
 ### 步骤 6: 设置 Webhook (最后一步)
 在您的浏览器中访问以下 URL（将域名替换为您刚部署的域名）：
-```https://my-telegram-bot.your-name.workers.dev/setup```
+`https://my-telegram-bot.your-name.workers.dev/setup`
 
 看到 `{"ok":true,...}` 即表示成功！您的机器人已开始运行。
 
+---
 
-### 方式二：📱 手机部署 (Cloudflare 网页端)
+## 方式二：📱 手机部署 (Cloudflare 网页端)
  * 这种方式无需电脑，所有操作都在手机浏览器中完成。
 
 ### 步骤 1: 创建 Worker
@@ -170,4 +171,5 @@ wrangler deploy
  * Q: 无法置顶信息卡？
    * 确保机器人在群组中有 Pin Messages (置顶消息) 权限。
  * Q: 无法创建话题？
+
    * 确保机器人在群组中有 Manage Topics (管理话题) 权限。
