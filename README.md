@@ -113,7 +113,7 @@ wrangler deploy
 
 ### 步骤 1: 创建 Worker
  * 登录 Cloudflare 仪表板。
- * 转到 "Workers & Pages" -> "创建应用重新" -> "*选择*从 Hello World! 开始"。
+ * 转到 "Workers & Pages" -> "创建应用程序" -> "*选择*从 Hello World! 开始"。
  * 给您的 Worker 起一个名字 (例如 my-telegram-bot)，然后点击 "Deploy"。
 
 ### 步骤 2: 粘贴代码
@@ -173,3 +173,4 @@ wrangler deploy
  * Q: 无法创建话题？
 
    * 确保机器人在群组中有 Manage Topics (管理话题) 权限。
+
