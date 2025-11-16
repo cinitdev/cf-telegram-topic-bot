@@ -113,15 +113,11 @@ wrangler deploy
 
 ### 步骤 1: 创建 Worker
  * 登录 Cloudflare 仪表板。
- * 转到 "Workers & Pages" -> "创建应用程序" -> "*选择*从 Hello World! 开始"。
- * 给您的 Worker 起一个名字 (例如 my-telegram-bot)，然后点击 "Deploy"。
+ * 将 GitHub 里面的 "index.js" 下载的本地
+ * 转到 "Workers & Pages" -> "创建应用程序" -> "拖放文件" -> "开始使用" -> "从计算机中选择" 上传 "index.js" 文件。
+ * 给您的 Worker 起一个名字 (例如 my-telegram-bot)，然后点击 "Deploy(部署)"。
 
-### 步骤 2: 粘贴代码
- * 部署后，点击 "编辑代码"。
- * 将 index.js 文件中的所有代码复制并粘贴到网页编辑器中，完全覆盖掉原有的 "Hello World" 模板代码。
- * 点击 "部署"。
-
-### 步骤 3: 创建并绑定 KV
+### 步骤 2: 创建并绑定 KV
  * 创建 KV：
    * 退回到 Cloudflare 仪表板。
    * 转到 "储存和数据库" -> "Workers KV"。
@@ -134,7 +130,7 @@ wrangler deploy
    * KV Namespace (KV 命名空间): 选择您刚创建的 my_bot_kv。
    * 点击 "添加绑定"。
 
-### 步骤 4: 设置变量信息 (Token 和 ID)
+### 步骤 3: 设置变量信息 (Token 和 ID)
  * 仍在 "设置" 页面，转到 "变量和机密"。
  * 在 "Environment Variables" (变量和机密) 下，点击 "添加"。
  * 文本类似即可，当然也可以选择密钥类型
@@ -147,14 +143,14 @@ wrangler deploy
    * Value: (粘贴您的群组 ID，例如 -100123...)
    * 点击 "保存"。
    
-### 步骤 5: 重新部署
+### 步骤 4: 重新部署
 
 非常重要：在设置完 KV 和变量后，您必须重新部署一次 Worker 才能让设置生效。
  * 回到 Worker 的 "Overview" (概览) 页面。
  * 点击 "编辑代码"。
  * 无需修改任何代码，直接点击 "部署"。
 
-### 步骤 6: 设置 Webhook (最后一步)
+### 步骤 5: 设置 Webhook (最后一步)
  * 在 Worker 的 "Overview" (概览) 页面，找到您的 *.workers.dev 域名。
  * 在您的手机浏览器中，打开一个新的标签页。
  * 访问这个 URL (将域名替换成您的)：
@@ -173,4 +169,5 @@ wrangler deploy
  * Q: 无法创建话题？
 
    * 确保机器人在群组中有 Manage Topics (管理话题) 权限。
+
 
