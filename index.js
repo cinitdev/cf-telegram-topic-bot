@@ -740,14 +740,20 @@ class TelegramBot {
 
       if (!userData.userInfo) {
         console.error(`用户 ${userId} 的 userInfo 为空！`);
-        await this.callAPI('sendMessage', { /* ... */ });
+        await this.callAPI('sendMessage', {
+          chat_id: userId,
+          text: '❌ 系统错误：用户信息缺失，请重新发送 /start 验证'
+        });
         return;
       }
 
       const topicId = await this.createUserTopic(userId, userData.userInfo);
       if (!topicId) {
         console.error(`创建话题失败，用户 ${userId}`);
-        await this.callAPI('sendMessage', { /* ... */ });
+        await this.callAPI('sendMessage', {
+          chat_id: userId,
+          text: '❌ 系统错误，请稍后重试'
+        });
         return;
       }
       userData.topicId = topicId;
@@ -916,7 +922,11 @@ class TelegramBot {
       blacklistedAt: Date.now(),
       reason: '管理员手动拉黑',
       blockedBy: callbackQuery.from.first_name,
-      userInfo: { /* ... (用户信息) ... */ }
+      userInfo: {
+        firstName: userInfo.firstName,
+        lastName: userInfo.lastName || '',
+        username: userInfo.username || ''
+      }
     }));
 
     // [重构] 使用 this.kv
@@ -927,9 +937,20 @@ class TelegramBot {
     }
 
     // ... (移除按钮, 回应回调, 发送通知)
-    await this.callAPI('editMessageReplyMarkup', { /* ... */ });
-    await this.callAPI('answerCallbackQuery', { /* ... */ });
-    await this.callAPI('sendMessage', { /* ... */ });
+    await this.callAPI('editMessageReplyMarkup', {
+      chat_id: this.adminGroupId,
+      message_id: callbackQuery.message.message_id,
+      reply_markup: { inline_keyboard: [] }
+    });
+    await this.callAPI('answerCallbackQuery', {
+      callback_query_id: callbackQuery.id,
+      text: '✅ 已拉黑用户'
+    });
+    await this.callAPI('sendMessage', {
+      chat_id: this.adminGroupId,
+      message_thread_id: topicId,
+      text: `🚫 用户已被拉黑\n\n操作者: ${callbackQuery.from.first_name}\n时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+    });
 
     // ... (在验证失败话题记录)
     const userName = userInfo.firstName + (userInfo.lastName ? ` ${userInfo.lastName}` : '');
@@ -939,63 +960,273 @@ class TelegramBot {
       await this.callAPI('sendMessage', {
         chat_id: this.adminGroupId, message_thread_id: failedTopicId,
         text: `🚫 *用户被手动拉黑*\n\n... (用户信息) ...`,
-        parse_mode: 'Markdown', reply_markup: { /* ... */ }
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '🔓 解除拉黑', callback_data: `unban_${userId}` }
+          ]]
+        }
       });
     }
 
     console.log(`用户 ${userId} 被管理员 ${callbackQuery.from.first_name} 手动拉黑`);
   }
 
+  //
+  // [!!!! BUG 修复 !!!!]
   // 处理用户编辑消息
+  //
   async handleUserEditedMessage(editedMessage) {
     const userId = editedMessage.from.id;
     const messageId = editedMessage.message_id;
 
     const adminMsgId = await this.getUserToAdminMapping(userId, messageId);
-    if (!adminMsgId) return;
-
-    // [重构] 使用 this.kv
-    const userData = JSON.parse(await this.kv.get(`user_${userId}`) || '{}');
-    if (!userData.topicId) return;
-
-    // ... (同步编辑逻辑不变, 使用 ✍️ 表情)
-    await this.callAPI('setMessageReaction', { chat_id: userId, message_id: messageId, reaction: [{ type: 'emoji', emoji: '✍️' }] });
-    if (editedMessage.text) {
-      await this.callAPI('editMessageText', { chat_id: this.adminGroupId, message_id: parseInt(adminMsgId), text: editedMessage.text });
-    } else if (editedMessage.caption) {
-      await this.callAPI('editMessageCaption', { chat_id: this.adminGroupId, message_id: parseInt(adminMsgId), caption: editedMessage.caption });
+    if (!adminMsgId) {
+      console.log(`未找到消息映射: 用户${userId}消息${messageId}`);
+      return;
     }
-    await this.callAPI('setMessageReaction', { chat_id: this.adminGroupId, message_id: parseInt(adminMsgId), reaction: [{ type: 'emoji', emoji: '✍️' }] });
+
+    const userData = JSON.parse(await this.kv.get(`user_${userId}`) || '{}');
+    if (!userData.topicId) {
+      console.log(`用户 ${userId} 没有话题ID`);
+      return;
+    }
+
+    console.log(`用户 ${userId} 编辑了消息 ${messageId}，对应管理群消息 ${adminMsgId}`);
+
+    // 1️⃣ 先给用户端的原始消息加表情（告诉用户编辑成功）
+    await this.callAPI('setMessageReaction', {
+      chat_id: userId,
+      message_id: messageId,
+      reaction: [{ type: 'emoji', emoji: '✍️' }]
+    });
+
+    // 2️⃣ [修复] 同步编辑
+    try {
+      if (editedMessage.text) {
+        // --- 纯文本编辑 ---
+        await this.callAPI('editMessageText', {
+          chat_id: this.adminGroupId,
+          message_id: parseInt(adminMsgId),
+          text: editedMessage.text
+        });
+        console.log(`已同步编辑管理群消息(文本)`);
+
+      } else if (editedMessage.photo || editedMessage.video || editedMessage.document || editedMessage.audio) {
+        // --- 媒体编辑（替换媒体 或 仅编辑标题） ---
+        let inputMedia;
+
+        if (editedMessage.photo) {
+          inputMedia = {
+            type: 'photo',
+            media: editedMessage.photo[editedMessage.photo.length - 1].file_id,
+            caption: editedMessage.caption || ''
+          };
+        } else if (editedMessage.video) {
+          inputMedia = {
+            type: 'video',
+            media: editedMessage.video.file_id,
+            caption: editedMessage.caption || ''
+          };
+        } else if (editedMessage.document) {
+          inputMedia = {
+            type: 'document',
+            media: editedMessage.document.file_id,
+            caption: editedMessage.caption || ''
+          };
+        } else if (editedMessage.audio) {
+          inputMedia = {
+            type: 'audio',
+            media: editedMessage.audio.file_id,
+            caption: editedMessage.caption || ''
+          };
+        }
+
+        // 优先尝试 editMessageMedia (替换媒体)
+        const mediaEditResult = await this.callAPI('editMessageMedia', {
+          chat_id: this.adminGroupId,
+          message_id: parseInt(adminMsgId),
+          media: inputMedia
+        });
+
+        if (!mediaEditResult.ok) {
+          // 失败了 (例如 "media is identical")，说明只是在编辑标题
+          console.log(`媒体编辑失败 (可能只是标题变更)，尝试仅编辑标题...`);
+          await this.callAPI('editMessageCaption', {
+            chat_id: this.adminGroupId,
+            message_id: parseInt(adminMsgId),
+            caption: editedMessage.caption || ''
+          });
+          console.log(`已同步编辑管理群消息(仅标题)`);
+        } else {
+          console.log(`已同步编辑管理群消息(媒体)`);
+        }
+
+      } else if (editedMessage.caption) {
+        // --- 兜底：仅编辑标题 (例如对于Bot不支持的媒体类型) ---
+        await this.callAPI('editMessageCaption', {
+          chat_id: this.adminGroupId,
+          message_id: parseInt(adminMsgId),
+          caption: editedMessage.caption
+        });
+        console.log(`已同步编辑管理群消息(仅标题 - Fallback)`);
+      }
+    } catch (e) {
+      console.error("同步编辑时出错:", e);
+    }
+
+    // 3️⃣ 给管理群的消息加表情（告诉管理员用户编辑了）
+    await this.callAPI('setMessageReaction', {
+      chat_id: this.adminGroupId,
+      message_id: parseInt(adminMsgId),
+      reaction: [{ type: 'emoji', emoji: '✍️' }]
+    });
+
+    // 4️⃣ 等待1秒后取消双端表情
     await new Promise(resolve => setTimeout(resolve, 1000));
-    await this.callAPI('setMessageReaction', { chat_id: userId, message_id: messageId, reaction: [] });
-    await this.callAPI('setMessageReaction', { chat_id: this.adminGroupId, message_id: parseInt(adminMsgId), reaction: [] });
+
+    await this.callAPI('setMessageReaction', {
+      chat_id: userId,
+      message_id: messageId,
+      reaction: []
+    });
+    await this.callAPI('setMessageReaction', {
+      chat_id: this.adminGroupId,
+      message_id: parseInt(adminMsgId),
+      reaction: []
+    });
+
+    console.log(`编辑同步完成`);
   }
 
+  //
+  // [!!!! BUG 修复 !!!!]
   // 处理管理员编辑消息
+  //
   async handleAdminEditedMessage(editedMessage) {
     const topicId = editedMessage.message_thread_id;
     if (!topicId || await this.isFailedTopic(topicId)) return;
 
     const messageId = editedMessage.message_id;
 
-    // [重构] 使用 this.kv
     const userId = await this.kv.get(`topic_${topicId}`);
-    if (!userId) return;
+    if (!userId) {
+      console.log(`未找到话题 ${topicId} 对应的用户`);
+      return;
+    }
 
     const userMsgId = await this.getAdminToUserMapping(userId, messageId);
-    if (!userMsgId) return;
-
-    // ... (同步编辑逻辑不变, 使用 ✍️ 表情)
-    await this.callAPI('setMessageReaction', { chat_id: this.adminGroupId, message_id: messageId, reaction: [{ type: 'emoji', emoji: '✍️' }] });
-    if (editedMessage.text) {
-      await this.callAPI('editMessageText', { chat_id: userId, message_id: parseInt(userMsgId), text: editedMessage.text });
-    } else if (editedMessage.caption) {
-      await this.callAPI('editMessageCaption', { chat_id: userId, message_id: parseInt(userMsgId), caption: editedMessage.caption });
+    if (!userMsgId) {
+      console.log(`未找到消息映射: 管理群消息${messageId}`);
+      return;
     }
-    await this.callAPI('setMessageReaction', { chat_id: userId, message_id: parseInt(userMsgId), reaction: [{ type: 'emoji', emoji: '✍️' }] });
+
+    console.log(`管理员编辑了消息 ${messageId}，对应用户 ${userId} 的消息 ${userMsgId}`);
+
+    // 1️⃣ 先给管理群的原始消息加表情
+    await this.callAPI('setMessageReaction', {
+      chat_id: this.adminGroupId,
+      message_id: messageId,
+      reaction: [{ type: 'emoji', emoji: '✍️' }]
+    });
+
+    // 2️⃣ [修复] 同步编辑
+    try {
+      if (editedMessage.text) {
+        // --- 纯文本编辑 ---
+        await this.callAPI('editMessageText', {
+          chat_id: userId,
+          message_id: parseInt(userMsgId),
+          text: editedMessage.text
+        });
+        console.log(`已同步编辑用户消息(文本)`);
+
+      } else if (editedMessage.photo || editedMessage.video || editedMessage.document || editedMessage.audio) {
+        // --- 媒体编辑（替换媒体 或 仅编辑标题） ---
+        let inputMedia;
+
+        if (editedMessage.photo) {
+          inputMedia = {
+            type: 'photo',
+            media: editedMessage.photo[editedMessage.photo.length - 1].file_id,
+            caption: editedMessage.caption || ''
+          };
+        } else if (editedMessage.video) {
+          inputMedia = {
+            type: 'video',
+            media: editedMessage.video.file_id,
+            caption: editedMessage.caption || ''
+          };
+        } else if (editedMessage.document) {
+          inputMedia = {
+            type: 'document',
+            media: editedMessage.document.file_id,
+            caption: editedMessage.caption || ''
+          };
+        } else if (editedMessage.audio) {
+          inputMedia = {
+            type: 'audio',
+            media: editedMessage.audio.file_id,
+            caption: editedMessage.caption || ''
+          };
+        }
+
+        // 优先尝试 editMessageMedia (替换媒体)
+        const mediaEditResult = await this.callAPI('editMessageMedia', {
+          chat_id: userId,
+          message_id: parseInt(userMsgId),
+          media: inputMedia
+        });
+
+        if (!mediaEditResult.ok) {
+          // 失败了 (例如 "media is identical")，说明只是在编辑标题
+          console.log(`媒体编辑失败 (可能只是标题变更)，尝试仅编辑标题...`);
+          await this.callAPI('editMessageCaption', {
+            chat_id: userId,
+            message_id: parseInt(userMsgId),
+            caption: editedMessage.caption || ''
+          });
+          console.log(`已同步编辑用户消息(仅标题)`);
+        } else {
+          console.log(`已同步编辑用户消息(媒体)`);
+        }
+
+      } else if (editedMessage.caption) {
+        // --- 兜底：仅编辑标题 ---
+        await this.callAPI('editMessageCaption', {
+          chat_id: userId,
+          message_id: parseInt(userMsgId),
+          caption: editedMessage.caption
+        });
+        console.log(`已同步编辑用户消息(仅标题 - Fallback)`);
+      }
+    } catch (e) {
+      console.error("同步编辑时出错:", e);
+    }
+
+
+    // 3️⃣ 给用户端的消息加表情
+    await this.callAPI('setMessageReaction', {
+      chat_id: userId,
+      message_id: parseInt(userMsgId),
+      reaction: [{ type: 'emoji', emoji: '✍️' }]
+    });
+
+    // 4️⃣ 等待1秒后取消双端表情
     await new Promise(resolve => setTimeout(resolve, 1000));
-    await this.callAPI('setMessageReaction', { chat_id: this.adminGroupId, message_id: messageId, reaction: [] });
-    await this.callAPI('setMessageReaction', { chat_id: userId, message_id: parseInt(userMsgId), reaction: [] });
+
+    await this.callAPI('setMessageReaction', {
+      chat_id: this.adminGroupId,
+      message_id: messageId,
+      reaction: []
+    });
+    await this.callAPI('setMessageReaction', {
+      chat_id: userId,
+      message_id: parseInt(userMsgId),
+      reaction: []
+    });
+
+    console.log(`编辑同步完成`);
   }
 
   // 处理命令
@@ -1140,7 +1371,8 @@ export default {
 
     // 获取 Webhook 信息
     if (url.pathname === '/info' && request.method === 'GET') {
-      const result = await this.callAPI('getWebhookInfo', {});
+      // [修复] 应该调用 bot.callAPI 而不是 this.callAPI
+      const result = await bot.callAPI('getWebhookInfo', {});
       return new Response(JSON.stringify(result, null, 2), {
         headers: { 'Content-Type': 'application/json' }
       });
