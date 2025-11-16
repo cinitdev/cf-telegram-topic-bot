@@ -113,7 +113,7 @@ wrangler deploy
 
 ### 步骤 1: 创建 Worker
  * 登录 Cloudflare 仪表板。
- * 将 GitHub 里面的 "index.js" 下载的本地
+ * 将 GitHub 里面的 "index.js" 下载到本地
  * 转到 "Workers & Pages" -> "创建应用程序" -> "拖放文件" -> "开始使用" -> "从计算机中选择" 上传 "index.js" 文件。
  * 给您的 Worker 起一个名字 (例如 my-telegram-bot)，然后点击 "Deploy(部署)"。
 
@@ -169,5 +169,6 @@ wrangler deploy
  * Q: 无法创建话题？
 
    * 确保机器人在群组中有 Manage Topics (管理话题) 权限。
+
 
 
